@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>在线 2FA 验证</title>
+<style>
+	body {
+		font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+		background:#f0f2f5;
+		display:flex;
+		justify-content:center;
+		align-items:center;
+		height:100vh;
+	}
+	.container {
+		background:#fff;
+		padding:30px;
+		border-radius:10px;
+		box-shadow:0 4px 12px rgba(0,0,0,0.1);
+		width:400px;
+	}
+	h1 { text-align:center; margin-bottom:20px; }
+	label { display:block; margin-top:15px; font-weight:bold; }
+	input {
+		width:100%;
+		padding:10px;
+		margin-top:5px;
+		border:1px solid #ccc;
+		border-radius:5px;
+	}
+	button {
+		margin-top:20px;
+		width:100%;
+		padding:10px;
+		background:#4CAF50;
+		color:white;
+		border:none;
+		border-radius:5px;
+		font-size:16px;
+		cursor:pointer;
+	}
+	.totp-code {
+		font-size:28px;
+		text-align:center;
+		margin-top:10px;
+		font-family:monospace;
+		cursor:pointer;
+	}
+	.progress-container {
+		background:#e0e0e0;
+		border-radius:5px;
+		height:10px;
+		margin-top:5px;
+	}
+	.progress-bar {
+		height:10px;
+		width:0%;
+		background:#4CAF50;
+		border-radius:5px;
+		transition: width 0.5s linear, background-color 0.3s;
+	}
+	.progress-bar.danger {
+		background:#e53935;
+	}
+	.result { margin-top:20px; text-align:center; font-weight:bold; }
+</style>
+</head>
+
+<body>
+<div class="container">
+	<h1>在线 2FA 验证</h1>
+
+	<label>Secret (Base32)</label>
+	<input id="secret" placeholder="输入你的 2FA secret">
+
+	<label>当前动态码（点击复制）</label>
+	<div class="totp-code" id="totpCode">------</div>
+
+	<div class="progress-container">
+		<div class="progress-bar" id="progressBar"></div>
+	</div>
+
+	<label>验证 TOTP</label>
+	<input id="verifyCode" placeholder="输入验证码">
+	<button id="verifyBtn">验证</button>
+
+	<div class="result" id="result"></div>
+</div>
+
+<script>
+const PERIOD = {{ .Period }};
+
+const secretInput = document.getElementById("secret");
+const totpCodeEl = document.getElementById("totpCode");
+const progressBar = document.getElementById("progressBar");
+const verifyBtn = document.getElementById("verifyBtn");
+const verifyCode = document.getElementById("verifyCode");
+const resultEl = document.getElementById("result");
+
+let secondsElapsed = 0;
+let currentCode = "------";
+let progressTimer = null;
+let requestTimer = null;
+
+/* 进度条：每秒本地更新 */
+function startProgress() {
+	if (progressTimer) clearInterval(progressTimer);
+	progressTimer = setInterval(() => {
+		secondsElapsed = (secondsElapsed + 1) % PERIOD;
+		const percent = secondsElapsed / PERIOD * 100;
+		const remaining = PERIOD - secondsElapsed;
+
+		progressBar.style.width = percent + "%";
+		progressBar.classList.toggle("danger", remaining <= 5);
+	}, 1000);
+}
+
+/* 请求 TOTP（5s / 1s） */
+function fetchTotp() {
+	const secret = secretInput.value.trim();
+	if (!secret) {
+		totpCodeEl.textContent = "------";
+		return;
+	}
+
+	fetch("/generate?secret=" + encodeURIComponent(secret))
+	.then(r => r.json())
+	.then(data => {
+		currentCode = data.code;
+		secondsElapsed = data.secondsElapsed;
+		totpCodeEl.textContent = currentCode;
+
+		const remaining = PERIOD - secondsElapsed;
+		const delay = remaining > 5 ? 5000 : 1000;
+
+		requestTimer = setTimeout(fetchTotp, delay);
+	});
+}
+
+secretInput.addEventListener("input", () => {
+	fetchTotp();
+	startProgress();
+});
+
+totpCodeEl.addEventListener("click", () => {
+	if (currentCode !== "------") {
+		navigator.clipboard.writeText(currentCode);
+		resultEl.textContent = "已复制 ✅";
+	}
+});
+
+verifyBtn.addEventListener("click", () => {
+	fetch(`/verify?secret=${encodeURIComponent(secretInput.value)}&code=${verifyCode.value}`)
+	.then(r => r.text())
+	.then(ok => {
+		resultEl.textContent = ok === "true" ? "验证通过 ✅" : "验证失败 ❌";
+	});
+});
+
+fetchTotp();
+startProgress();
+</script>
+</body>
+</html>
