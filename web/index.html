@@ -2,163 +2,850 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>在线 2FA 验证</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>在线 2FA 动态码</title>
 <style>
+	:root {
+		--bg: #f5f7fb;
+		--surface: #ffffff;
+		--surface-soft: #f8fafc;
+		--text: #111827;
+		--muted: #667085;
+		--line: #d9e0ea;
+		--accent: #2563eb;
+		--accent-strong: #1d4ed8;
+		--success: #059669;
+		--danger: #dc2626;
+		--shadow: 0 18px 50px rgba(15, 23, 42, 0.10);
+	}
+
+	* { box-sizing: border-box; }
+
 	body {
-		font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-		background:#f0f2f5;
-		display:flex;
-		justify-content:center;
-		align-items:center;
-		height:100vh;
+		margin: 0;
+		min-height: 100vh;
+		background:
+			radial-gradient(circle at top left, rgba(37, 99, 235, 0.10), transparent 32rem),
+			linear-gradient(135deg, #f5f7fb 0%, #eef4ff 48%, #f8fafc 100%);
+		color: var(--text);
+		font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 	}
-	.container {
-		background:#fff;
-		padding:30px;
-		border-radius:10px;
-		box-shadow:0 4px 12px rgba(0,0,0,0.1);
-		width:400px;
-	}
-	h1 { text-align:center; margin-bottom:20px; }
-	label { display:block; margin-top:15px; font-weight:bold; }
+
+	button,
 	input {
-		width:100%;
-		padding:10px;
-		margin-top:5px;
-		border:1px solid #ccc;
-		border-radius:5px;
+		font: inherit;
 	}
+
 	button {
-		margin-top:20px;
-		width:100%;
-		padding:10px;
-		background:#4CAF50;
-		color:white;
-		border:none;
-		border-radius:5px;
-		font-size:16px;
-		cursor:pointer;
+		border: 0;
+		cursor: pointer;
 	}
-	.totp-code {
-		font-size:28px;
-		text-align:center;
-		margin-top:10px;
-		font-family:monospace;
-		cursor:pointer;
+
+	.app {
+		width: min(1120px, calc(100% - 32px));
+		margin: 0 auto;
+		padding: 32px 0;
 	}
-	.progress-container {
-		background:#e0e0e0;
-		border-radius:5px;
-		height:10px;
-		margin-top:5px;
+
+	.header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 16px;
+		margin-bottom: 28px;
 	}
+
+	.brand {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		color: inherit;
+		text-decoration: none;
+	}
+
+	.brand-mark {
+		display: grid;
+		width: 40px;
+		height: 40px;
+		place-items: center;
+		border-radius: 8px;
+		background: #111827;
+		color: #ffffff;
+		font-weight: 800;
+		letter-spacing: 0;
+	}
+
+	.brand-title {
+		font-size: 18px;
+		font-weight: 760;
+		line-height: 1.1;
+	}
+
+	.brand-subtitle {
+		margin-top: 3px;
+		color: var(--muted);
+		font-size: 13px;
+	}
+
+	.nav {
+		display: flex;
+		gap: 8px;
+		padding: 4px;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.76);
+	}
+
+	.nav a {
+		padding: 9px 13px;
+		border-radius: 6px;
+		color: var(--muted);
+		font-size: 14px;
+		font-weight: 650;
+		text-decoration: none;
+	}
+
+	body[data-view="home"] .nav a[data-route="home"],
+	body[data-view="single"] .nav a[data-route="home"],
+	body[data-view="list"] .nav a[data-route="list"] {
+		background: var(--text);
+		color: #ffffff;
+	}
+
+	.panel {
+		display: none;
+		border: 1px solid rgba(217, 224, 234, 0.92);
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.88);
+		box-shadow: var(--shadow);
+		backdrop-filter: blur(12px);
+	}
+
+	body[data-view="home"] #singlePanel,
+	body[data-view="single"] #singlePanel,
+	body[data-view="list"] #listPanel {
+		display: block;
+	}
+
+	.single-panel {
+		max-width: 640px;
+		margin: 56px auto 0;
+		padding: 30px;
+	}
+
+	.panel h1 {
+		margin: 0;
+		font-size: clamp(28px, 4vw, 42px);
+		line-height: 1.05;
+		letter-spacing: 0;
+	}
+
+	.panel-lead {
+		margin: 12px 0 0;
+		color: var(--muted);
+		font-size: 15px;
+		line-height: 1.7;
+	}
+
+	.field {
+		margin-top: 24px;
+	}
+
+	.field label {
+		display: block;
+		margin-bottom: 8px;
+		color: #344054;
+		font-size: 13px;
+		font-weight: 720;
+	}
+
+	.input-row {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 10px;
+	}
+
+	.list-form .input-row {
+		grid-template-columns: minmax(240px, 1.3fr) minmax(180px, 0.9fr) auto;
+		align-items: end;
+	}
+
+	input {
+		width: 100%;
+		min-height: 44px;
+		padding: 0 13px;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		outline: none;
+		background: #ffffff;
+		color: var(--text);
+	}
+
+	input:focus {
+		border-color: rgba(37, 99, 235, 0.70);
+		box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+	}
+
+	.input-with-clear {
+		position: relative;
+	}
+
+	.input-with-clear input {
+		padding-right: 46px;
+	}
+
+	.clear-input-button {
+		position: absolute;
+		top: 50%;
+		right: 8px;
+		display: grid;
+		width: 30px;
+		height: 30px;
+		place-items: center;
+		border: 1px solid transparent;
+		border-radius: 8px;
+		background: transparent;
+		color: var(--muted);
+		transform: translateY(-50%);
+	}
+
+	.clear-input-button:hover,
+	.clear-input-button:focus-visible {
+		background: #eef4ff;
+		color: var(--accent);
+	}
+
+	.clear-input-button[hidden] {
+		display: none;
+	}
+
+	.clear-input-button svg {
+		width: 16px;
+		height: 16px;
+		stroke: currentColor;
+	}
+
+	.primary-button {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 44px;
+		padding: 0 17px;
+		border-radius: 8px;
+		background: var(--accent);
+		color: #ffffff;
+		font-weight: 760;
+		white-space: nowrap;
+	}
+
+	.primary-button:hover {
+		background: var(--accent-strong);
+	}
+
+	.secret-chip {
+		display: none;
+		margin-top: 22px;
+		padding: 12px 14px;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		background: var(--surface-soft);
+		color: var(--muted);
+		font-size: 13px;
+		line-height: 1.5;
+		word-break: break-all;
+	}
+
+	body[data-view="single"] .secret-chip {
+		display: block;
+	}
+
+	body[data-view="single"] .home-only {
+		display: none;
+	}
+
+	.code-card {
+		margin-top: 24px;
+		padding: 22px;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+	}
+
+	.code-label {
+		display: flex;
+		justify-content: space-between;
+		gap: 12px;
+		color: var(--muted);
+		font-size: 13px;
+		font-weight: 680;
+	}
+
+	.code-button {
+		display: block;
+		width: 100%;
+		margin-top: 10px;
+		padding: 8px 0 4px;
+		background: transparent;
+		color: var(--accent);
+		font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+		font-size: clamp(44px, 12vw, 72px);
+		font-weight: 800;
+		line-height: 1;
+		letter-spacing: 0;
+		text-align: center;
+	}
+
+	.progress-track {
+		overflow: hidden;
+		height: 8px;
+		margin-top: 18px;
+		border-radius: 999px;
+		background: #e5eaf2;
+	}
+
 	.progress-bar {
-		height:10px;
-		width:0%;
-		background:#4CAF50;
-		border-radius:5px;
-		transition: width 0.5s linear, background-color 0.3s;
+		width: 0%;
+		height: 100%;
+		border-radius: inherit;
+		background: var(--success);
+		transition: width 0.25s linear, background-color 0.2s ease;
 	}
+
 	.progress-bar.danger {
-		background:#e53935;
+		background: var(--danger);
 	}
-	.result { margin-top:20px; text-align:center; font-weight:bold; }
+
+	.toast {
+		min-height: 22px;
+		margin-top: 16px;
+		color: var(--success);
+		font-size: 14px;
+		font-weight: 700;
+		text-align: center;
+	}
+
+	.list-panel {
+		padding: 24px;
+	}
+
+	.list-top {
+		display: flex;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: 18px;
+		margin-bottom: 22px;
+	}
+
+	.list-top h1 {
+		font-size: 30px;
+	}
+
+	.table-scroll {
+		overflow-x: auto;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		background: #ffffff;
+	}
+
+	table {
+		width: 100%;
+		min-width: 760px;
+		border-collapse: collapse;
+	}
+
+	th,
+	td {
+		padding: 14px 16px;
+		border-bottom: 1px solid #edf1f7;
+		text-align: left;
+		vertical-align: middle;
+	}
+
+	th {
+		background: var(--surface-soft);
+		color: #475467;
+		font-size: 12px;
+		font-weight: 800;
+		text-transform: uppercase;
+	}
+
+	tr:last-child td {
+		border-bottom: 0;
+	}
+
+	.secret-cell {
+		max-width: 260px;
+		color: #344054;
+		font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+		font-size: 13px;
+		word-break: break-all;
+	}
+
+	.secret-link {
+		color: inherit;
+		text-decoration: none;
+	}
+
+	.secret-link:hover {
+		color: var(--accent);
+		text-decoration: underline;
+		text-underline-offset: 3px;
+	}
+
+	.code-cell-button {
+		padding: 4px 0;
+		background: transparent;
+		color: var(--accent);
+		font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+		font-size: 24px;
+		font-weight: 800;
+		letter-spacing: 0;
+	}
+
+	.expiry {
+		min-width: 92px;
+		color: var(--muted);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.note-cell {
+		color: #344054;
+	}
+
+	.action-buttons {
+		display: flex;
+		gap: 8px;
+	}
+
+	.icon-button {
+		display: inline-grid;
+		width: 34px;
+		height: 34px;
+		place-items: center;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		background: #ffffff;
+		color: #475467;
+	}
+
+	.icon-button:hover {
+		border-color: rgba(37, 99, 235, 0.35);
+		color: var(--accent);
+	}
+
+	.icon-button.danger:hover {
+		border-color: rgba(220, 38, 38, 0.35);
+		color: var(--danger);
+	}
+
+	.icon-button svg {
+		width: 17px;
+		height: 17px;
+		stroke: currentColor;
+	}
+
+	.empty {
+		padding: 28px;
+		color: var(--muted);
+		text-align: center;
+	}
+
+	@media (max-width: 760px) {
+		.app {
+			width: min(100% - 20px, 1120px);
+			padding: 18px 0;
+		}
+
+		.header,
+		.list-top {
+			align-items: stretch;
+			flex-direction: column;
+		}
+
+		.nav {
+			width: 100%;
+		}
+
+		.nav a {
+			flex: 1;
+			text-align: center;
+		}
+
+		.single-panel,
+		.list-panel {
+			margin-top: 22px;
+			padding: 20px;
+		}
+
+		.list-form .input-row {
+			grid-template-columns: 1fr;
+		}
+
+		.primary-button {
+			width: 100%;
+		}
+	}
 </style>
 </head>
 
-<body>
-<div class="container">
-	<h1>在线 2FA 验证</h1>
+<body data-view="{{ .View }}" data-initial-secret="{{ .Secret }}" data-period="{{ .Period }}">
+<div class="app">
+	<header class="header">
+		<div class="brand">
+			<span class="brand-mark">2F</span>
+			<span>
+				<span class="brand-title">在线 2FA 动态码</span>
+				<span class="brand-subtitle">本地生成与管理 TOTP</span>
+			</span>
+		</div>
+		<nav class="nav" aria-label="页面导航">
+			<a data-route="home" href="/">单个动态码</a>
+			<a data-route="list" href="/list">动态码列表</a>
+		</nav>
+	</header>
 
-	<label>Secret (Base32)</label>
-	<input id="secret" placeholder="输入你的 2FA secret">
+	<main>
+		<section class="panel single-panel" id="singlePanel">
+			<h1 id="singleTitle">生成 2FA 动态码</h1>
+			<p class="panel-lead" id="singleLead">输入 Base32 Secret，即时查看当前 30 秒周期内的动态码。</p>
 
-	<label>当前动态码（点击复制）</label>
-	<div class="totp-code" id="totpCode">------</div>
+			<div class="field home-only">
+				<label for="singleSecret">Secret (Base32)</label>
+				<div class="input-row">
+					<div class="input-with-clear">
+						<input id="singleSecret" autocomplete="off" spellcheck="false" placeholder="输入你的 2FA Secret">
+						<button class="clear-input-button" id="clearSingleSecret" type="button" aria-label="清空 Secret" title="清空 Secret" hidden>
+							<svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+								<path d="M18 6 6 18"></path>
+								<path d="M6 6l12 12"></path>
+							</svg>
+						</button>
+					</div>
+				</div>
+			</div>
 
-	<div class="progress-container">
-		<div class="progress-bar" id="progressBar"></div>
-	</div>
+			<div class="secret-chip" id="singleSecretText"></div>
 
-	<label>验证 TOTP</label>
-	<input id="verifyCode" placeholder="输入验证码">
-	<button id="verifyBtn">验证</button>
+			<div class="code-card">
+				<div class="code-label">
+					<span>当前动态码，点击可复制</span>
+					<span id="singleExpiry">-- 秒</span>
+				</div>
+				<button class="code-button" id="singleCode" type="button">------</button>
+				<div class="progress-track" aria-hidden="true">
+					<div class="progress-bar" id="singleProgress"></div>
+				</div>
+			</div>
 
-	<div class="result" id="result"></div>
+			<div class="toast" id="singleToast" role="status" aria-live="polite"></div>
+		</section>
+
+		<section class="panel list-panel" id="listPanel">
+			<div class="list-top">
+				<div>
+					<h1>动态码列表</h1>
+					<p class="panel-lead">保存多个 Secret 到当前浏览器，统一查看和复制动态码。</p>
+				</div>
+			</div>
+
+			<form class="list-form" id="listForm">
+				<div class="input-row">
+					<div>
+						<label for="listSecret">Secret (Base32)</label>
+						<input id="listSecret" autocomplete="off" spellcheck="false" placeholder="JBSWY3DPEHPK3PXP">
+					</div>
+					<div>
+						<label for="listNote">备注</label>
+						<input id="listNote" autocomplete="off" placeholder="账号或用途">
+					</div>
+					<button class="primary-button" type="submit">添加</button>
+				</div>
+			</form>
+
+			<div class="table-scroll" style="margin-top: 20px;">
+				<table>
+					<thead>
+						<tr>
+							<th>Secret</th>
+							<th>Code</th>
+							<th>有效期</th>
+							<th>备注</th>
+							<th>操作</th>
+						</tr>
+					</thead>
+					<tbody id="secretTableBody"></tbody>
+				</table>
+				<div class="empty" id="emptyState">暂无记录，添加一个 Secret 后会显示在这里。</div>
+			</div>
+
+			<div class="toast" id="listToast" role="status" aria-live="polite"></div>
+		</section>
+	</main>
 </div>
 
 <script>
-const PERIOD = {{ .Period }};
+const body = document.body;
+const VIEW = body.dataset.view || "home";
+const INITIAL_SECRET = body.dataset.initialSecret || "";
+const PERIOD = Number(body.dataset.period || 30);
+const STORAGE_KEY = "web2fa.secrets";
+const SINGLE_SECRET_KEY = "web2fa.singleSecret";
+const copyIcon = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+const trashIcon = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v5"></path><path d="M14 11v5"></path></svg>';
 
-const secretInput = document.getElementById("secret");
-const totpCodeEl = document.getElementById("totpCode");
-const progressBar = document.getElementById("progressBar");
-const verifyBtn = document.getElementById("verifyBtn");
-const verifyCode = document.getElementById("verifyCode");
-const resultEl = document.getElementById("result");
+const singleSecret = document.getElementById("singleSecret");
+const clearSingleSecret = document.getElementById("clearSingleSecret");
+const singleSecretText = document.getElementById("singleSecretText");
+const singleTitle = document.getElementById("singleTitle");
+const singleLead = document.getElementById("singleLead");
+const singleCode = document.getElementById("singleCode");
+const singleExpiry = document.getElementById("singleExpiry");
+const singleProgress = document.getElementById("singleProgress");
+const singleToast = document.getElementById("singleToast");
+const listForm = document.getElementById("listForm");
+const listSecret = document.getElementById("listSecret");
+const listNote = document.getElementById("listNote");
+const secretTableBody = document.getElementById("secretTableBody");
+const emptyState = document.getElementById("emptyState");
+const listToast = document.getElementById("listToast");
 
-let secondsElapsed = 0;
-let currentCode = "------";
-let progressTimer = null;
-let requestTimer = null;
+let records = loadRecords();
+let codeState = new Map();
 
-/* 进度条：每秒本地更新 */
-function startProgress() {
-	if (progressTimer) clearInterval(progressTimer);
-	progressTimer = setInterval(() => {
-		secondsElapsed = (secondsElapsed + 1) % PERIOD;
-		const percent = secondsElapsed / PERIOD * 100;
-		const remaining = PERIOD - secondsElapsed;
-
-		progressBar.style.width = percent + "%";
-		progressBar.classList.toggle("danger", remaining <= 5);
-	}, 1000);
+function loadRecords() {
+	try {
+		const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+		if (!Array.isArray(parsed)) return [];
+		const seen = new Set();
+		const uniqueRecords = [];
+		for (const record of parsed) {
+			const normalized = normalizeSecret(record.secret || "");
+			if (!normalized || seen.has(normalized)) continue;
+			seen.add(normalized);
+			uniqueRecords.push(record);
+		}
+		if (uniqueRecords.length !== parsed.length) {
+			localStorage.setItem(STORAGE_KEY, JSON.stringify(uniqueRecords));
+		}
+		return uniqueRecords;
+	} catch {
+		return [];
+	}
 }
 
-/* 请求 TOTP（5s / 1s） */
-function fetchTotp() {
-	const secret = secretInput.value.trim();
+function saveRecords() {
+	localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+}
+
+function cleanSecret(secret) {
+	return secret.trim();
+}
+
+function normalizeSecret(secret) {
+	return secret.replace(/[\s-]/g, "").toUpperCase();
+}
+
+function findDuplicateSecret(secret) {
+	const normalized = normalizeSecret(secret);
+	return records.find((record) => normalizeSecret(record.secret || "") === normalized);
+}
+
+function createId() {
+	return window.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
+}
+
+async function fetchCode(secret) {
+	const response = await fetch("/generate?secret=" + encodeURIComponent(secret));
+	return response.json();
+}
+
+function remainingSeconds(secondsElapsed) {
+	return Math.max(0, PERIOD - Number(secondsElapsed || 0));
+}
+
+function updateProgress(bar, secondsElapsed) {
+	const elapsed = Number(secondsElapsed || 0);
+	const remaining = remainingSeconds(elapsed);
+	bar.style.width = Math.min(100, elapsed / PERIOD * 100) + "%";
+	bar.classList.toggle("danger", remaining <= 5);
+	return remaining;
+}
+
+async function copyText(text, toast) {
+	if (!text || text === "------" || text === "错误") return;
+	try {
+		await navigator.clipboard.writeText(text);
+	} catch {
+		const temp = document.createElement("textarea");
+		temp.value = text;
+		document.body.appendChild(temp);
+		temp.select();
+		document.execCommand("copy");
+		temp.remove();
+	}
+	showToast(toast, "已复制");
+}
+
+function showToast(toast, message) {
+	toast.textContent = message;
+	window.clearTimeout(toast._timer);
+	toast._timer = window.setTimeout(() => {
+		toast.textContent = "";
+	}, 1600);
+}
+
+function updateSingleSecretClearButton() {
+	if (!clearSingleSecret || !singleSecret) return;
+	clearSingleSecret.hidden = !singleSecret.value;
+}
+
+async function refreshSingle() {
+	const secret = VIEW === "single" ? INITIAL_SECRET : cleanSecret(singleSecret.value);
 	if (!secret) {
-		totpCodeEl.textContent = "------";
+		singleCode.textContent = "------";
+		singleExpiry.textContent = "-- 秒";
+		singleProgress.style.width = "0%";
 		return;
 	}
 
-	fetch("/generate?secret=" + encodeURIComponent(secret))
-	.then(r => r.json())
-	.then(data => {
-		currentCode = data.code;
-		secondsElapsed = data.secondsElapsed;
-		totpCodeEl.textContent = currentCode;
+	const data = await fetchCode(secret);
+	singleCode.textContent = data.code || "错误";
+	const remaining = updateProgress(singleProgress, data.secondsElapsed);
+	singleExpiry.textContent = remaining + " 秒";
+}
 
-		const remaining = PERIOD - secondsElapsed;
-		const delay = remaining > 5 ? 5000 : 1000;
+function setupSinglePage() {
+	if (VIEW === "single") {
+		singleTitle.textContent = "2FA 动态码";
+		singleLead.textContent = "此页面展示 URL 中 Secret 对应的当前动态码。";
+		singleSecretText.textContent = "Secret: " + INITIAL_SECRET;
+	} else if (singleSecret) {
+		singleSecret.value = localStorage.getItem(SINGLE_SECRET_KEY) || "";
+		updateSingleSecretClearButton();
+		singleSecret.addEventListener("input", () => {
+			localStorage.setItem(SINGLE_SECRET_KEY, singleSecret.value);
+			updateSingleSecretClearButton();
+			refreshSingle();
+		});
+		clearSingleSecret.addEventListener("click", () => {
+			singleSecret.value = "";
+			localStorage.removeItem(SINGLE_SECRET_KEY);
+			updateSingleSecretClearButton();
+			refreshSingle();
+			singleSecret.focus();
+		});
+	}
 
-		requestTimer = setTimeout(fetchTotp, delay);
+	singleCode.addEventListener("click", () => copyText(singleCode.textContent, singleToast));
+	refreshSingle();
+	window.setInterval(refreshSingle, 1000);
+}
+
+function renderList() {
+	secretTableBody.textContent = "";
+	emptyState.hidden = records.length > 0;
+
+	for (const record of records) {
+		const row = document.createElement("tr");
+		const secretCell = document.createElement("td");
+		const codeCell = document.createElement("td");
+		const expiryCell = document.createElement("td");
+		const noteCell = document.createElement("td");
+		const actionCell = document.createElement("td");
+		const secretLink = document.createElement("a");
+		const codeButton = document.createElement("button");
+		const actions = document.createElement("div");
+		const copyButton = document.createElement("button");
+		const deleteButton = document.createElement("button");
+
+		secretCell.className = "secret-cell";
+		secretLink.className = "secret-link";
+		secretLink.setAttribute("href", "/" + encodeURIComponent(record.secret));
+		secretLink.textContent = record.secret;
+		secretCell.appendChild(secretLink);
+		codeButton.className = "code-cell-button";
+		codeButton.type = "button";
+		codeButton.textContent = "------";
+		codeButton.addEventListener("click", () => copyRecordCode(record.id));
+		codeCell.appendChild(codeButton);
+		expiryCell.className = "expiry";
+		expiryCell.textContent = "-- 秒";
+		noteCell.className = "note-cell";
+		noteCell.textContent = record.note || "-";
+		actions.className = "action-buttons";
+		copyButton.className = "icon-button";
+		copyButton.type = "button";
+		copyButton.title = "复制动态码";
+		copyButton.setAttribute("aria-label", "复制动态码");
+		copyButton.innerHTML = copyIcon;
+		copyButton.addEventListener("click", () => copyRecordCode(record.id));
+		deleteButton.className = "icon-button danger";
+		deleteButton.type = "button";
+		deleteButton.title = "删除";
+		deleteButton.setAttribute("aria-label", "删除");
+		deleteButton.innerHTML = trashIcon;
+		deleteButton.addEventListener("click", () => deleteRecord(record.id));
+		actions.append(copyButton, deleteButton);
+		actionCell.appendChild(actions);
+		row.dataset.id = record.id;
+		row.append(secretCell, codeCell, expiryCell, noteCell, actionCell);
+		secretTableBody.appendChild(row);
+	}
+}
+
+async function refreshListCodes() {
+	if (VIEW !== "list" || records.length === 0) return;
+
+	await Promise.all(records.map(async (record) => {
+		const data = await fetchCode(record.secret);
+		codeState.set(record.id, data);
+		const row = secretTableBody.querySelector(`tr[data-id="${record.id}"]`);
+		if (!row) return;
+		row.querySelector(".code-cell-button").textContent = data.code || "错误";
+		row.querySelector(".expiry").textContent = remainingSeconds(data.secondsElapsed) + " 秒";
+	}));
+}
+
+function copyRecordCode(id) {
+	const data = codeState.get(id);
+	copyText(data && data.code, listToast);
+}
+
+function deleteRecord(id) {
+	records = records.filter((record) => record.id !== id);
+	codeState.delete(id);
+	saveRecords();
+	renderList();
+	refreshListCodes();
+}
+
+function setupListPage() {
+	renderList();
+	refreshListCodes();
+	window.setInterval(refreshListCodes, 1000);
+	listForm.addEventListener("submit", (event) => {
+		event.preventDefault();
+		const secret = cleanSecret(listSecret.value);
+		if (!secret) return;
+		if (findDuplicateSecret(secret)) {
+			showToast(listToast, "Secret 已存在");
+			return;
+		}
+		records.unshift({ id: createId(), secret, note: listNote.value.trim() });
+		saveRecords();
+		listSecret.value = "";
+		listNote.value = "";
+		renderList();
+		refreshListCodes();
+		showToast(listToast, "已添加");
 	});
 }
 
-secretInput.addEventListener("input", () => {
-	fetchTotp();
-	startProgress();
-});
-
-totpCodeEl.addEventListener("click", () => {
-	if (currentCode !== "------") {
-		navigator.clipboard.writeText(currentCode);
-		resultEl.textContent = "已复制 ✅";
-	}
-});
-
-verifyBtn.addEventListener("click", () => {
-	fetch(`/verify?secret=${encodeURIComponent(secretInput.value)}&code=${verifyCode.value}`)
-	.then(r => r.text())
-	.then(ok => {
-		resultEl.textContent = ok === "true" ? "验证通过 ✅" : "验证失败 ❌";
-	});
-});
-
-fetchTotp();
-startProgress();
+if (VIEW === "list") {
+	setupListPage();
+} else {
+	setupSinglePage();
+}
 </script>
 </body>
 </html>

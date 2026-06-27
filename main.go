@@ -20,17 +20,20 @@ const (
 )
 
 func main() {
-	r := gin.Default()
+	r := setupRouter()
+	if err := r.Run(":8081"); err != nil {
+		panic(err)
+	}
+}
 
+func setupRouter() *gin.Engine {
+	r := gin.Default()
 	tmpl := template.Must(
 		template.ParseFS(htmlFS, "web/index.html"),
 	)
 
 	r.GET("/", func(c *gin.Context) {
-		c.Header("Content-Type", "text/html; charset=utf-8")
-		_ = tmpl.Execute(c.Writer, gin.H{
-			"Period": period,
-		})
+		renderPage(c, tmpl, "home", "")
 	})
 
 	// 生成 TOTP，返回 JSON 包含 code 和当前秒数
@@ -50,22 +53,34 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"code": code, "secondsElapsed": secondsElapsed})
 	})
 
-	// 验证 TOTP
-	r.GET("/verify", func(c *gin.Context) {
-		secret := parseSecret(c.Query("secret"))
-		code := strings.TrimSpace(c.Query("code"))
-		valid := totp.Validate(code, secret)
-		c.String(http.StatusOK, map[bool]string{
-			true:  "true",
-			false: "false",
-		}[valid])
+	r.GET("/list", func(c *gin.Context) {
+		renderPage(c, tmpl, "list", "")
 	})
 
-	r.Run(":8081")
+	r.GET("/:secret", func(c *gin.Context) {
+		secret := strings.TrimSpace(c.Param("secret"))
+		if secret == "" || secret == "verify" {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		renderPage(c, tmpl, "single", secret)
+	})
+
+	return r
+}
+
+func renderPage(c *gin.Context, tmpl *template.Template, view string, secret string) {
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	_ = tmpl.Execute(c.Writer, gin.H{
+		"Period": period,
+		"View":   view,
+		"Secret": secret,
+	})
 }
 
 func parseSecret(secret string) string {
-	s := strings.ReplaceAll(secret, " ", "")
+	s := strings.TrimSpace(secret)
+	s = strings.ReplaceAll(s, " ", "")
 	s = strings.ReplaceAll(s, "-", "")
 	return s
 }
