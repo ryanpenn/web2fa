@@ -1,0 +1,19 @@
+name: web2fa
+
+services:
+  web2fa:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: web2fa:local
+    container_name: web2fa
+    environment:
+      GIN_MODE: release
+    ports:
+      - "8081:8081"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
